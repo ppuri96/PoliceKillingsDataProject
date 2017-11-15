@@ -15,6 +15,104 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r, message=FALSE, warning=FALSE}
 library(tidyverse)
-data <- read.csv("https://raw.githubusercontent.com/fivethirtyeight/data/master/police-killings/police_killings.csv")
-head(data)
+police_data <- read.csv("https://raw.githubusercontent.com/fivethirtyeight/data/master/police-killings/police_killings.csv")
 ```
+
+```{r, message=FALSE, warning=FALSE}
+library(ggmap)
+map <- get_map(location = 'United States', zoom = 4)
+ggmap(map) + geom_point(aes(x = longitude, y = latitude, color = raceethnicity, 
+                            size = h_income, alpha = 0.5), data = police_data) + 
+  labs(color = "Race/Ethnicity", size = "Average Household Income",
+       title = "Map of Fatal Shootings in the United States",
+       x = "Longitude", y = "Latitude") + guides(alpha=FALSE)
+ggsave("ShootingsPointMap.png", path = "/Users/piyushpuri/Desktop")
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+library(dplyr)
+
+df <- data.frame(state.abb, state.name)
+
+all_states <- map_data("state")
+data$region <- df$state.name[match(data$state, df$state.abb)]
+data$region <- sapply(data$region, tolower)
+
+us <- map_data("state")
+
+x <- data.frame(table(data$region))
+
+data$murder <- rep(0, nrow(data))
+
+
+for (state in na.omit(unique(data$region))) {
+  data$murder[data$region == state] = x$Freq[x$Var1 == state]
+}
+
+gg <- ggplot()
+gg <- gg + geom_map(data=us, map=us,
+                    aes(x=long, y=lat, map_id=region),
+                    fill="#ffffff", color="#ffffff", size=0.15)
+gg <- gg + geom_map(data=data, map=us,
+                    aes(fill=murder, map_id=region),
+                    color="#ffffff", size=0.15)
+gg <- gg + scale_fill_continuous(low='thistle2', high='darkred', 
+                                 guide='colorbar')
+gg <- gg + labs(x=NULL, y=NULL)
+gg <- gg + coord_map("albers", lat0 = 39, lat1 = 45) 
+gg <- gg + theme(panel.border = element_blank())
+gg <- gg + theme(panel.background = element_blank())
+gg <- gg + theme(axis.ticks = element_blank())
+gg <- gg + theme(axis.text = element_blank())
+gg
+ggsave("ShootingsMap.png", path = "/Users/piyushpuri/Desktop")
+```
+
+```{r, warning=FALSE, message=FALSE}
+police_data <- mutate(police_data, 
+                    age_group = cut(as.numeric(as.character(age)), c(0, 20, 40, 60, 80, 100), 
+                                      labels = c("0-20", "20-40","40-60",
+                                                 "60-80","80-100")))
+ggplot(police_data, aes(as.numeric(as.character(p_income)))) + 
+  geom_histogram(aes(fill = gender)) + facet_wrap(~age_group) + 
+  labs(title = "Personal Income Distribution based on Gender and Age Groups",
+       x = "Personal Income", y = "Number of Victims")
+ggsave("FacetHist.png", path = "/Users/piyushpuri/Desktop")
+```
+
+```{r, warning=FALSE, message=FALSE}
+ggplot(police_data, aes(x = college, y = h_income)) + geom_point(aes(color = cause)) +
+  labs(x = "College Graduation Rate (BA or higher)", y = "Average Household Income",
+       color = "Cause of Death", title = "Income vs. Education Rate")
+ggsave("VictimsScatterplot.png", path = "/Users/piyushpuri/Desktop")
+```
+
+```{r, warning=FALSE, message=FALSE}
+library(lubridate)
+data$Date <- as.Date(paste(match(data$month, month.name) , data$day , sep = "/" )  , format = "%m/%d" )
+year(data$Date) <- 2015
+ggplot(data, aes(x = Date)) + geom_line(stat = "count") + 
+  geom_vline(xintercept = as.numeric(as.Date("2015-04-12")), linetype=4, color = "red") +
+  labs(y = "Number of Fatal Shootings", title = "Number of Shootings by Day",
+       subtitle = "Red Line: Freddie Gray Shooting")
+ggsave("TimeSeriesPlot.png", path = "/Users/piyushpuri/Desktop")
+```
+
+```{r, warning=FALSE, message=FALSE}
+#running levels code more than once messes up data
+levels(police_data$armed)[4] = "Unarmed"
+levels(police_data$armed)[c(2,3,5,8)] = "Armed"
+levels(police_data$armed)[c(1,5)] = "Unsure"
+```
+
+```{r, warning=FALSE, message=FALSE}
+ggplot(police_data, aes(x = raceethnicity, fill = armed)) + geom_bar(position = "fill") +
+  labs(fill = "Weapon", x = "Race/Ethnicity", y = "Proportion of Shootings",
+       title = "Proportion of Shooting Victims That Were Armed or Unarmed") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ggsave("StackedHist.png", path = "/Users/piyushpuri/Desktop")
+```
+
+
+
