@@ -15,24 +15,29 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r, message=FALSE, warning=FALSE}
 library(tidyverse)
+library(ggmap)
+library(dplyr)
+library(lubridate)
 police_data <- read.csv("https://raw.githubusercontent.com/fivethirtyeight/data/master/police-killings/police_killings.csv")
 ```
 
 ```{r, message=FALSE, warning=FALSE}
-library(ggmap)
 map <- get_map(location = 'United States', zoom = 4)
+
 ggmap(map) + geom_point(aes(x = longitude, y = latitude, color = raceethnicity, 
-                            size = h_income, alpha = 0.5), data = police_data) + 
-  labs(color = "Race/Ethnicity", size = "Average Household Income",
-       title = "Map of Fatal Shootings in the United States",
-       x = "Longitude", y = "Latitude") + guides(alpha=FALSE)
+                          shape = gender, alpha = 0.5), size = 3, 
+                        data = police_data) + 
+  labs(color = "Race/Ethnicity",
+       title = "Police Killings in the United States by Race",
+       x = "", y = "", shape = "Gender") + guides(size=FALSE, alpha=FALSE) + 
+  theme(axis.title.x=element_blank(),axis.text.x=element_blank(), 
+        axis.ticks.x=element_blank(), axis.title.y=element_blank(),
+        axis.text.y=element_blank(), axis.ticks.y=element_blank())
 ggsave("ShootingsPointMap.png", path = "/Users/piyushpuri/Desktop")
 ```
 
 
 ```{r, warning=FALSE, message=FALSE}
-library(dplyr)
-
 df <- data.frame(state.abb, state.name)
 
 all_states <- map_data("state")
@@ -59,44 +64,51 @@ gg <- gg + geom_map(data=data, map=us,
                     color="#ffffff", size=0.15)
 gg <- gg + scale_fill_continuous(low='thistle2', high='darkred', 
                                  guide='colorbar')
-gg <- gg + labs(x=NULL, y=NULL)
+gg <- gg + labs(x=NULL, y=NULL, title = "Police Killings Across the United States", 
+                fill = "Killings")
 gg <- gg + coord_map("albers", lat0 = 39, lat1 = 45) 
 gg <- gg + theme(panel.border = element_blank())
 gg <- gg + theme(panel.background = element_blank())
 gg <- gg + theme(axis.ticks = element_blank())
 gg <- gg + theme(axis.text = element_blank())
-gg
+gg 
 ggsave("ShootingsMap.png", path = "/Users/piyushpuri/Desktop")
 ```
 
 ```{r, warning=FALSE, message=FALSE}
 police_data <- mutate(police_data, 
-                    age_group = cut(as.numeric(as.character(age)), c(0, 20, 40, 60, 80, 100), 
+                    age_group = cut(as.numeric(as.character(age)), c(0, 20, 40, 60, 100), 
                                       labels = c("0-20", "20-40","40-60",
-                                                 "60-80","80-100")))
-ggplot(police_data, aes(as.numeric(as.character(p_income)))) + 
-  geom_histogram(aes(fill = gender)) + facet_wrap(~age_group) + 
-  labs(title = "Personal Income Distribution based on Gender and Age Groups",
-       x = "Personal Income", y = "Number of Victims")
+                                                 "60-100")))
+ggplot(na.omit(police_data), aes(as.numeric(as.character(h_income)))) + 
+  geom_histogram(color = "#013243", fill = "#446CB3") + 
+  geom_vline(xintercept = as.numeric(56500), linetype=4, color = "red") +
+  facet_wrap(~age_group) + 
+  theme(axis.text.x = element_text(hjust= 1)) +
+  labs(title = "Household Income Distribution based on Gender and Age Groups",
+       x = "Household Income", y = "Number of Victims", 
+       subtitle = "Red Line: Real Median Household Income (2015)")
 ggsave("FacetHist.png", path = "/Users/piyushpuri/Desktop")
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-ggplot(police_data, aes(x = college, y = h_income)) + geom_point(aes(color = cause)) +
-  labs(x = "College Graduation Rate (BA or higher)", y = "Average Household Income",
-       color = "Cause of Death", title = "Income vs. Education Rate")
+ggplot(police_data, aes(x = college, y = as.numeric(as.character(p_income)))) + geom_point(aes(color = cause)) +
+  labs(x = "College Graduation Rate (BA or higher)", y = "Average Personal Income",
+       color = "Cause of Death", title = "Cause of Victim Death By Income and Education")
 ggsave("VictimsScatterplot.png", path = "/Users/piyushpuri/Desktop")
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-library(lubridate)
-data$Date <- as.Date(paste(match(data$month, month.name) , data$day , sep = "/" )  , format = "%m/%d" )
-year(data$Date) <- 2015
-ggplot(data, aes(x = Date)) + geom_line(stat = "count") + 
-  geom_vline(xintercept = as.numeric(as.Date("2015-04-12")), linetype=4, color = "red") +
+police_data$Date <- as.Date(paste(match(data$month, month.name) , data$day , sep = "/" )  , format = "%m/%d" )
+year(police_data$Date) <- 2015
+ggplot(police_data, aes(x = Date)) + 
+  geom_line(aes(colour = "orange"), stat = "count") + 
+  geom_line(aes(colour = "blue"), stat = "count", data = police_data[which(police_data$raceethnicity == "Black"),]) + 
+  geom_vline(xintercept = as.numeric(as.Date("2015-04-12")), linetype=2, color = "black", size=1) +
+  scale_color_discrete(name = "Race/Ethnicity", labels = c("Black", "Total")) + 
   labs(y = "Number of Fatal Shootings", title = "Number of Shootings by Day",
-       subtitle = "Red Line: Freddie Gray Shooting")
-ggsave("TimeSeriesPlot.png", path = "/Users/piyushpuri/Desktop")
+       subtitle = "Black Line: Freddie Gray Shooting") 
+ggsave("TimeSeriesPlot.png", path = "/Users/piyushpuri/Desktop") 
 ```
 
 ```{r, warning=FALSE, message=FALSE}
